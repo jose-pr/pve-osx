@@ -113,6 +113,90 @@ def enable_drivers(config_path: str, names: "_ty.Sequence[str]" = VIRTIO_DRIVERS
         plistlib.dump(config, f)
 
 
+#: The standard macOS-guest kexts: (artifact name, path(s) inside its zip to
+#: copy into Kexts/). Sample.plist already lists Lilu/VirtualSMC/WhateverGreen/
+#: AppleALC (Enabled=True) in Kernel.Add -- it just doesn't ship the actual
+#: kext files, since each is a separate Acidanthera project. SMCProcessor and
+#: SMCSuperIO (VirtualSMC's sensor plugins -- without them, VirtualSMC can't
+#: answer most SMC key queries, which is what caused a real PowerlogCore/
+#: SMCGetKeyFromIndex CPU spin diagnosed live on 2026-07-23) have no
+#: Sample.plist entry at all, so :func:`kernel_add_entries` builds theirs
+#: from scratch instead of just flipping Enabled like `enable_drivers` does.
+STANDARD_KEXTS: "dict[str, tuple[str, ...]]" = {
+    "lilu-1.7.2": ("Lilu.kext",),
+    "virtualsmc-1.3.7": (
+        "Kexts/VirtualSMC.kext",
+        "Kexts/SMCProcessor.kext",
+        "Kexts/SMCSuperIO.kext",
+    ),
+    "whatevergreen-1.7.0": ("WhateverGreen.kext",),
+    "applealc-1.9.7": ("AppleALC.kext",),
+}
+
+#: New Kernel.Add entries this package adds beyond what Sample.plist already
+#: declares (VirtualSMC's sensor plugins -- see STANDARD_KEXTS docstring).
+EXTRA_KERNEL_ADD: "tuple[dict[str, _ty.Any], ...]" = (
+    {
+        "Arch": "Any",
+        "BundlePath": "SMCProcessor.kext",
+        "Comment": "SMC CPU sensors",
+        "Enabled": True,
+        "ExecutablePath": "Contents/MacOS/SMCProcessor",
+        "MaxKernel": "",
+        "MinKernel": "8.0.0",
+        "PlistPath": "Contents/Info.plist",
+    },
+    {
+        "Arch": "Any",
+        "BundlePath": "SMCSuperIO.kext",
+        "Comment": "SMC fan sensors",
+        "Enabled": True,
+        "ExecutablePath": "Contents/MacOS/SMCSuperIO",
+        "MaxKernel": "",
+        "MinKernel": "8.0.0",
+        "PlistPath": "Contents/Info.plist",
+    },
+)
+
+
+def install_kexts(cache_dir: str, kexts_dir: str) -> None:
+    """Fetch (checksum-verified) and copy every :data:`STANDARD_KEXTS` bundle
+    into ``kexts_dir``."""
+    from . import artifacts
+
+    os.makedirs(kexts_dir, exist_ok=True)
+    for name, paths in STANDARD_KEXTS.items():
+        zip_path = os.path.join(cache_dir, f"{name}.zip")
+        artifacts.fetch(name, zip_path)
+        extracted = os.path.join(cache_dir, name)
+        if os.path.isdir(extracted):
+            shutil.rmtree(extracted)
+        with zipfile.ZipFile(zip_path) as z:
+            z.extractall(extracted)
+        for rel_path in paths:
+            src = os.path.join(extracted, *rel_path.split("/"))
+            dest = os.path.join(kexts_dir, os.path.basename(rel_path))
+            if os.path.isdir(dest):
+                shutil.rmtree(dest)
+            shutil.copytree(src, dest)
+
+
+def add_kernel_entries(
+    config_path: str, entries: "_ty.Sequence[dict]" = EXTRA_KERNEL_ADD
+) -> None:
+    """Append ``entries`` to ``Kernel.Add`` (skipping any whose ``BundlePath``
+    is already present, so this is safe to call more than once)."""
+    with open(config_path, "rb") as f:
+        config = plistlib.load(f)
+    kernel_add = config.setdefault("Kernel", {}).setdefault("Add", [])
+    existing = {e.get("BundlePath") for e in kernel_add if isinstance(e, dict)}
+    for entry in entries:
+        if entry["BundlePath"] not in existing:
+            kernel_add.append(dict(entry))
+    with open(config_path, "wb") as f:
+        plistlib.dump(config, f)
+
+
 class Efi(PveOsxCmd, Cli):
     """EFI/OpenCore artifact building."""
 
@@ -188,12 +272,17 @@ class EfiBuild(EfiCmd):
         config_out = os.path.join(efi_dir, "OC", "config.plist")
         patch_config(sample_plist, config_out, smbios)
         enable_drivers(config_out)
+        add_kernel_entries(config_out)
+
+        self._logger_.info("Fetching and installing standard kexts (checksum-verified)...")
+        install_kexts(cache, os.path.join(efi_dir, "OC", "Kexts"))
 
         print(f"EFI folder assembled at: {efi_out}")
         print(f"  model:  {smbios['SystemProductName']}")
         print(f"  serial: {smbios['SystemSerialNumber']}")
         print(f"  mlb:    {smbios['MLB']}")
         print(f"  uuid:   {smbios['SystemUUID']}")
+        print(f"  kexts:  {', '.join(sorted(os.listdir(os.path.join(efi_dir, 'OC', 'Kexts'))))}")
         print(
             "next step: write this EFI/ folder onto the VM's EFI disk (e.g. via "
             "mtools/mcopy on the Proxmox host) -- pve-osx does not build a FAT/ISO "

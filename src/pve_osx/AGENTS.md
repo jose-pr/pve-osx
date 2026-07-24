@@ -52,7 +52,7 @@ itself a signal that thing has no REST endpoint.
   `insecure_accept_unknown_hosts=True`.
   - `.run(command, timeout=30) -> str` — stdout; raises `SshError` (stderr
     included) on non-zero exit.
-  - `.sftp_get(remote_path) -> bytes`.
+  - `.sftp_get(remote_path) -> bytes`, `.sftp_put(local_path, remote_path)`.
   - `.monitor(vmid, command) -> str` — one raw QEMU HMP command via
     `qm monitor`.
   - `.screendump(vmid, remote_tmp=None) -> bytes` — the VM's console
@@ -67,7 +67,10 @@ itself a signal that thing has no REST endpoint.
   underscore form for this specific flag): fixes a known KVM+macOS livelock on
   multi-vCPU guests where vCPUs spin at high CPU while the installer barely
   advances. Discovered and verified live against a real hung install
-  (2026-07-23).
+  (2026-07-23). Also includes `vmware-cpuid-freq=on` (cross-referenced against
+  three independent macOS-on-Proxmox write-ups, 2026-07-23 — all three list
+  it) so macOS reads its CPU frequency correctly instead of guessing from
+  calibration.
 - **`APPLE_SMC_OSK`** — the public Apple SMC OSK string used by every
   OpenCore/Hackintosh setup (not a secret).
 - **`cpu_arg(flags=DEFAULT_CPU_FLAGS, *, base="host") -> str`** — renders the
@@ -134,11 +137,31 @@ onto `Vm`, not the root.
   --disk-storage --bridge --vlan --vmid --disk-bus --display]`** — builds a
   `MacOSProfile`, preflights free space on the target storage (raises
   `SystemExit` rather than attempting a create doomed to run out of room),
-  then `create_vm` (`vga=<display>`, `numa=1`, main disk on `<disk-bus>=...`,
-  `boot=order=<disk-bus>`); on any `PveError` after the VM is registered,
-  destroys it before re-raising so a failed create never leaves an orphaned
-  VM. Does not yet attach an EFI/installer artifact -- run `efi build` and
-  attach manually.
+  then `create_vm` (`vga=<display>`, `numa=1`, `agent=enabled=1,type=isa`,
+  main disk on `<disk-bus>=...`, `boot=order=<disk-bus>`); on any `PveError`
+  after the VM is registered, destroys it before re-raising so a failed
+  create never leaves an orphaned VM. Does not yet attach an EFI/installer
+  artifact -- run `efi build` and attach manually.
+- **`vm provision <guest_host> [--guest-user --skip-agent
+  --skip-screen-sharing]`** — post-*boot* guest-side setup over SSH (separate
+  from `vm create`'s pre-boot VM config): verifies Remote Login, enables
+  Screen Sharing persistently (`launchctl enable system/com.apple.screensharing`
+  + `bootstrap`), and installs/upgrades the community `mac-guest-agent`
+  (checksum-verified via `pve_osx.artifacts`, idempotent -- falls back to
+  `--upgrade` if already installed). Requires SSH already reachable (Remote
+  Login is a one-time manual console step -- pve-osx can't enable it before
+  SSH exists) and passwordless sudo for `--guest-user` (also a one-time
+  manual step: `echo '<user> ALL=(ALL) NOPASSWD: ALL' | sudo tee
+  /etc/sudoers.d/pve-osx` -- pve-osx never handles a password itself).
+
+### The `mac-guest-agent` transport gotcha
+
+`mac-guest-agent` v2.5.0+ requires an **ISA-serial** channel and refuses
+Proxmox's *default* virtio-serial one outright (crash-loops every ~10s,
+diagnosed live 2026-07-23 via its own log at `/var/log/mac-guest-agent.log`).
+`vm create` sets `agent=enabled=1,type=isa` for exactly this reason; for a
+VM created before this fix, run `qm set <vmid> --agent enabled=1,type=isa`
+and restart it.
 
 ## `pve-osx efi ...` (`pve_osx.efi`)
 
@@ -149,13 +172,15 @@ Nested command group (`Efi(PveOsxCmd, duho.Cli)`, `_parsername_ = "efi"`).
   fresh SMBIOS identity for `--model` via the bundled `macserial -g` (parses
   its `Serial | MLB` output; `SystemUUID`/`ROM` generated directly via
   `uuid.uuid4()`/`os.urandom(6)`), patches those into `PlatformInfo.Generic`
-  of OpenCore's `Docs/Sample.plist`, and enables every `Virtio*.efi` entry
-  already declared (disabled) in `UEFI.Drivers` -- writing the result to
-  `<out>/EFI/OC/config.plist` alongside the rest of `<out>/EFI/` copied from
-  the release (which already includes the Virtio DXE driver files
-  themselves, no separate fetch needed). Does not yet build a FAT/ISO image
-  from that folder -- the printed next step says to write it onto the VM's
-  EFI disk via `mtools`/`mcopy` on the Proxmox host.
+  of OpenCore's `Docs/Sample.plist`, enables every `Virtio*.efi` entry already
+  declared (disabled) in `UEFI.Drivers`, appends `SMCProcessor.kext`/
+  `SMCSuperIO.kext` to `Kernel.Add`, and fetches+installs the six standard
+  kexts (`STANDARD_KEXTS`) into `<out>/EFI/OC/Kexts/` -- writing the patched
+  config to `<out>/EFI/OC/config.plist` alongside the rest of `<out>/EFI/`
+  copied from the release (which already includes the Virtio DXE driver
+  files themselves, no separate fetch needed for those). Does not yet build a
+  FAT/ISO image from that folder -- the printed next step says to write it
+  onto the VM's EFI disk via `mtools`/`mcopy` on the Proxmox host.
 - **`generate_smbios(macserial_path, model) -> dict`**,
   **`patch_config(sample_plist_path, out_path, smbios)`** — the two steps
   above, usable standalone.
@@ -166,7 +191,31 @@ Nested command group (`Efi(PveOsxCmd, duho.Cli)`, `_parsername_ = "efi"`).
   the profile's actual `disk_bus` choice.
 - **`enable_drivers(config_path, names=VIRTIO_DRIVERS)`** — flips `Enabled`
   on for the named `UEFI.Drivers` entries already present in the plist at
-  `config_path`, in place.
+  `config_path`, in place. **Not safe to assume the entries exist** --
+  some hand-built configs (e.g. the original OSX-PROXMOX tool's live output,
+  found 2026-07-23) only keep the drivers actually in use, not
+  `Sample.plist`'s full disabled-placeholder list; in that case append fresh
+  entries instead (see the live-EFI patch pattern used that day, not
+  currently exposed as a reusable function -- `enable_drivers` alone is
+  correct for a fresh `Sample.plist`-based build, which is all `efi build`
+  itself produces).
+- **`STANDARD_KEXTS`** — `dict[artifact_name, tuple[path_in_zip, ...]]` for
+  the four kexts `Sample.plist` already references in `Kernel.Add`
+  (Lilu/VirtualSMC/WhateverGreen/AppleALC) but whose actual files the
+  OpenCore zip does not bundle (each is a separate Acidanthera project/release
+  cadence). `install_kexts(cache_dir, kexts_dir)` fetches (checksum-verified)
+  and copies them all.
+- **`EXTRA_KERNEL_ADD`** / **`add_kernel_entries(config_path,
+  entries=EXTRA_KERNEL_ADD)`** — `SMCProcessor.kext`/`SMCSuperIO.kext` have no
+  `Sample.plist` placeholder at all (unlike the Virtio drivers), so this
+  appends whole new `Kernel.Add` entries rather than flipping `Enabled` on an
+  existing one; skips any `BundlePath` already present, so safe to call more
+  than once. These two matter beyond "completeness": without them,
+  `VirtualSMC.kext` alone can't answer most SMC sensor queries, which is what
+  caused a real `PowerlogCore`/`SMCGetKeyFromIndex` CPU spin diagnosed live on
+  a fresh boot (2026-07-23, via `/Library/Logs/DiagnosticReports/
+  PerfPowerServices_*.cpu_resource.diag` -- macOS's own automatic
+  excessive-CPU watchdog report).
 - **`EfiError`** — raised when the extracted OpenCore archive doesn't have the
   expected layout.
 

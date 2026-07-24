@@ -26,7 +26,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Performance-oriented defaults for `vm create`: `nvme0` as the default disk
   bus (macOS's native NVMe driver needs no kext, unlike relying on implicit
   virtio-blk handling), `qxl` display (SPICE console -- no acceleration
-  trade-off for macOS either way without real GPU passthrough), and NUMA
-  enabled.
+  trade-off for macOS either way without real GPU passthrough), NUMA enabled,
+  and `vmware-cpuid-freq=on` added to the default CPU flags (cross-referenced
+  against three independent macOS-on-Proxmox write-ups).
+- `efi build` now fetches and installs the four standard kexts
+  (Lilu/VirtualSMC/WhateverGreen/AppleALC) that `Sample.plist` references but
+  the OpenCore release doesn't bundle, plus `SMCProcessor.kext`/
+  `SMCSuperIO.kext` (VirtualSMC's sensor plugins -- missing these caused a
+  real `PowerlogCore` CPU spin on first boot, diagnosed via macOS's own
+  automatic diagnostic report).
+- `vm create` now sets `agent=enabled=1,type=isa`: the community
+  `mac-guest-agent` requires an ISA-serial channel and crash-loops on
+  Proxmox's default virtio-serial one.
+- New `vm provision` command: post-boot guest setup over SSH (verify Remote
+  Login, enable Screen Sharing persistently, install/upgrade
+  `mac-guest-agent`, checksum-verified and idempotent).
 
 [Unreleased]: https://github.com/jose-pr/pve-osx/compare/v0.1.0...HEAD

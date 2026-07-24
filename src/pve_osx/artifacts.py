@@ -43,6 +43,40 @@ MANIFEST: "dict[str, Artifact]" = {
         sha256="2ffab6ebf58c7aefb0bcb3a1a385d207746823d6dd87d44bd666e1286939943e",
         size=10437696,
     ),
+    # The four kexts every macOS guest needs -- Sample.plist already lists
+    # them (Enabled=True) in Kernel.Add, but the OpenCore release zip does
+    # not bundle the actual kext files; they're separate Acidanthera
+    # projects with their own release cadence.
+    "lilu-1.7.2": Artifact(
+        url="https://github.com/acidanthera/Lilu/releases/download/1.7.2/Lilu-1.7.2-RELEASE.zip",
+        sha256="53967d7dcfaab01023a33df2e969a89522f13d6654a6a56ac4711b62dabf3ab8",
+        size=781360,
+    ),
+    "virtualsmc-1.3.7": Artifact(
+        url="https://github.com/acidanthera/VirtualSMC/releases/download/1.3.7/VirtualSMC-1.3.7-RELEASE.zip",
+        sha256="12f1d379969f926306fa92d94ddbf33b32b31176589dc42089d864a26b31b700",
+        size=1377786,
+    ),
+    "whatevergreen-1.7.0": Artifact(
+        url="https://github.com/acidanthera/WhateverGreen/releases/download/1.7.0/WhateverGreen-1.7.0-RELEASE.zip",
+        sha256="6d6ffe8334ad60f784a662794e67b2560b79d757d506841dc8ca9994ab39979b",
+        size=571730,
+    ),
+    "applealc-1.9.7": Artifact(
+        url="https://github.com/acidanthera/AppleALC/releases/download/1.9.7/AppleALC-1.9.7-RELEASE.zip",
+        sha256="81a8ba79986130e8c845fff595950226cbc30e588f8d37089e467f776469c29d",
+        size=3752348,
+    ),
+    # Community QEMU guest agent for macOS -- upstream QEMU's own qemu-ga
+    # doesn't build/ship for Darwin; see pve_osx.vm's agent-transport note
+    # (this agent needs an ISA-serial channel, not Proxmox's default
+    # virtio-serial -- vm create sets agent=enabled=1,type=isa for exactly
+    # that reason).
+    "mac-guest-agent-2.5.6": Artifact(
+        url="https://github.com/mav2287/mac-guest-agent/releases/download/v2.5.6/mac-guest-agent",
+        sha256="fa501be5d8707b92b6b112d359007bb12163d5e95b3931f1fd7307b42afc03aa",
+        size=531304,
+    ),
 }
 
 

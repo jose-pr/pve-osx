@@ -21,6 +21,10 @@ APPLE_SMC_OSK = "ourhardworkbythesewordsguardedpleasedontsteal(c)AppleComputerIn
 
 #: Hardened default CPU flags for a macOS guest. Callers may extend/override
 #: via :attr:`MacOSProfile.extra_cpu_flags`, but should not need to.
+#: ``vmware-cpuid-freq=on`` cross-referenced against three independent
+#: community write-ups on macOS-on-Proxmox (2026-07-23) -- all three list it;
+#: it's what lets macOS read its own CPU frequency correctly instead of
+#: guessing from calibration.
 DEFAULT_CPU_FLAGS: "tuple[str, ...]" = (
     "kvm=on",
     "vendor=GenuineIntel",
@@ -29,6 +33,7 @@ DEFAULT_CPU_FLAGS: "tuple[str, ...]" = (
     "-kvm-pv-ipi",  # the fix: see module docstring
     "+hypervisor",
     "+invtsc",
+    "vmware-cpuid-freq=on",
 )
 
 
