@@ -1,0 +1,32 @@
+.DS_Store
+.DS_Store?
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+logs
+
+# python (kb/python.md)
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.hypothesis/
+.mypy_cache/
+.ruff_cache/
+.coverage*
+htmlcov/
+*.egg-info/
+.venv/
+dist/
+build/
+site/
+
+# private agent workspace, never committed
+.agents
+CLAUDE*
+.claude
+
+# local secrets, never committed
+.env
+.env.*
+!.env.example
