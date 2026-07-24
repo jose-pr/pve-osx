@@ -32,8 +32,9 @@ dependencies = ["duho>=0.3.2"]
 [project.optional-dependencies]
 api = ["proxmoxer", "requests"]
 ssh = ["paramiko"]
-all = ["proxmoxer", "requests", "paramiko"]
-dev = ["build", "hatchling", "pytest", "pytest-timeout", "twine", "proxmoxer", "requests", "paramiko"]
+img = ["Pillow"]
+all = ["proxmoxer", "requests", "paramiko", "Pillow"]
+dev = ["build", "hatchling", "pytest", "pytest-timeout", "twine", "proxmoxer", "requests", "paramiko", "Pillow"]
 docs = ["mkdocs", "mkdocs-material", "mkdocstrings[python]"]
 
 [project.scripts]
@@ -48,7 +49,7 @@ Issues = "https://github.com/jose-pr/pve-osx/issues"
 "README.md" = "pve_osx/README.md"
 
 [tool.hatch.build.targets.sdist]
-exclude = ["/.*", "/tools"]
+exclude = ["/.*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

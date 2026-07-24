@@ -11,12 +11,36 @@ worth noting (it means the REST API had no endpoint for it).
 
 from __future__ import annotations
 
+import dataclasses
 import io
 import typing as _ty
 
 
 class SshError(RuntimeError):
     """An SSH command or SFTP transfer failed."""
+
+
+@dataclasses.dataclass
+class VmProcessStatus:
+    """Host-side view of a VM's QEMU process, for the ``vm diagnose`` heuristic."""
+
+    pid: int
+    cpu_percent: float
+    elapsed_seconds: int
+    state: str
+
+
+def _parse_elapsed(etime: str) -> int:
+    """Parse ``ps -o etime``'s ``[[DD-]HH:]MM:SS`` format into seconds."""
+    days = 0
+    if "-" in etime:
+        d, etime = etime.split("-", 1)
+        days = int(d)
+    parts = [int(p) for p in etime.split(":")]
+    while len(parts) < 3:
+        parts.insert(0, 0)
+    hours, minutes, seconds = parts
+    return days * 86400 + hours * 3600 + minutes * 60 + seconds
 
 
 class SshClient:
@@ -118,3 +142,26 @@ class SshClient:
         data = self.sftp_get(remote_path)
         self.run(f"rm -f {remote_path}")
         return data
+
+    # -- host-side process info -- no REST equivalent (that's per-guest, this
+    # is the host's view of the QEMU process itself) -----------------------
+
+    def vm_process_status(self, vmid: int) -> "_ty.Optional[VmProcessStatus]":
+        """The host-side QEMU process for ``vmid``: PID, %CPU, and how long
+        it's been running. Returns ``None`` if the VM isn't running (no pidfile).
+        """
+        pid_raw = self.run(
+            f"cat /var/run/qemu-server/{vmid}.pid 2>/dev/null || true"
+        ).strip()
+        if not pid_raw:
+            return None
+        out = self.run(f"ps -o pid,pcpu,etime,stat -p {pid_raw} --no-headers").strip()
+        if not out:
+            return None
+        pid, pcpu, etime, stat = out.split(None, 3)
+        return VmProcessStatus(
+            pid=int(pid),
+            cpu_percent=float(pcpu),
+            elapsed_seconds=_parse_elapsed(etime),
+            state=stat,
+        )
