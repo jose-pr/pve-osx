@@ -122,6 +122,13 @@ class SshClient:
         finally:
             sftp.close()
 
+    def sftp_put(self, local_path: str, remote_path: str) -> None:
+        sftp = self._client.open_sftp()
+        try:
+            sftp.put(local_path, remote_path)
+        finally:
+            sftp.close()
+
     # -- QEMU monitor (HMP) -- the one thing with no REST endpoint ---------
 
     def monitor(self, vmid: int, command: str) -> str:

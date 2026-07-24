@@ -255,6 +255,12 @@ class VmCreate(VmCmd):
                 net0=profile.net_config(),
                 args=profile.args(),
                 vga=profile.display,
+                # type=isa: the community mac-guest-agent needs an ISA-serial
+                # channel -- Proxmox's default (virtio-serial) makes it
+                # crash-loop on every connect attempt (diagnosed live,
+                # 2026-07-23). See pve_osx.efi's STANDARD_KEXTS docstring for
+                # the matching guest-side install step.
+                agent="enabled=1,type=isa",
                 efidisk0=f"{profile.efi_storage}:1,pre-enrolled-keys=0",
                 **{
                     profile.disk_bus: (
@@ -281,3 +287,99 @@ class VmCreate(VmCmd):
 
 
 VmCreate._register()
+
+
+class VmProvision(VmCmd):
+    """Post-boot guest setup over SSH: verify Remote Login, enable Screen
+    Sharing persistently, and install the community mac-guest-agent
+    (checksum-verified).
+
+    Requires SSH already reachable in the guest -- enabling Remote Login the
+    very first time is a one-time manual console step (System Settings ->
+    General -> Sharing -> Remote Login, or `sudo systemsetup -setremotelogin
+    on` in Terminal) that pve-osx cannot do for you before SSH exists. This
+    command also requires passwordless sudo for --guest-user (one-time setup:
+    `echo '<user> ALL=(ALL) NOPASSWD: ALL' | sudo tee /etc/sudoers.d/pve-osx`)
+    -- pve-osx never handles your password itself.
+    """
+
+    _parsername_ = "provision"
+    _logger_name_ = "pve_osx.vm"
+
+    guest_host: str = ""
+    "Guest's own SSH host/IP (not the Proxmox host -- that's --ssh-host)"
+    ("guest_host",)
+
+    guest_user: str = "admin"
+    "Guest SSH user (needs passwordless sudo -- see class docstring)"
+    ("--guest-user",)
+
+    skip_agent: bool = False
+    "Skip installing mac-guest-agent (e.g. if already installed)"
+    ("--skip-agent",)
+
+    skip_screen_sharing: bool = False
+    "Skip enabling Screen Sharing"
+    ("--skip-screen-sharing",)
+
+    def __call__(self) -> "int | None":
+        import os
+        import tempfile
+
+        from . import artifacts
+        from .ssh import SshClient, SshError
+
+        self._logger_.info(f"Connecting to {self.guest_user}@{self.guest_host}...")
+        with SshClient(self.guest_host, user=self.guest_user) as ssh:
+            try:
+                ssh.run("sudo -n true")
+            except SshError as e:
+                raise SystemExit(
+                    f"pve-osx: passwordless sudo required for {self.guest_user} -- "
+                    "run this once yourself in the guest: echo "
+                    f"'{self.guest_user} ALL=(ALL) NOPASSWD: ALL' | sudo tee "
+                    "/etc/sudoers.d/pve-osx"
+                ) from e
+
+            remote_login = ssh.run("sudo systemsetup -getremotelogin").strip()
+            print(f"SSH (Remote Login): {remote_login}")
+
+            if not self.skip_screen_sharing:
+                self._logger_.info("Enabling Screen Sharing persistently...")
+                ssh.run("sudo launchctl enable system/com.apple.screensharing")
+                try:
+                    ssh.run(
+                        "sudo launchctl bootstrap system "
+                        "/System/Library/LaunchDaemons/com.apple.screensharing.plist"
+                    )
+                except SshError:
+                    pass  # already bootstrapped -- harmless, `enable` above is what matters
+                print("Screen Sharing: enabled")
+
+            if not self.skip_agent:
+                self._logger_.info("Installing mac-guest-agent (checksum-verified)...")
+                cache = tempfile.mkdtemp(prefix="pve-osx-artifacts-")
+                local_path = artifacts.fetch(
+                    "mac-guest-agent-2.5.6", os.path.join(cache, "mac-guest-agent")
+                )
+                remote_path = "/tmp/mac-guest-agent"
+                ssh.sftp_put(local_path, remote_path)
+                ssh.run(f"chmod +x {remote_path}")
+                try:
+                    ssh.run(f"sudo {remote_path} --install")
+                except SshError as e:
+                    if "already installed" not in str(e):
+                        raise
+                    self._logger_.info("Already installed -- upgrading instead...")
+                    ssh.run(f"sudo {remote_path} --upgrade")
+                ssh.run(f"rm -f {remote_path}")
+                print(
+                    "mac-guest-agent: installed/up to date (requires the VM's `agent:` "
+                    "config to use type=isa, not Proxmox's default virtio-serial -- "
+                    "vm create sets this automatically; for an existing VM: qm set "
+                    "<vmid> --agent enabled=1,type=isa, then restart)"
+                )
+        return 0
+
+
+VmProvision._register()
