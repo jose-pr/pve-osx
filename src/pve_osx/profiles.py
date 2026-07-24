@@ -68,6 +68,20 @@ class MacOSProfile:
     bridge: str = "vmbr0"
     vlan_tag: "_ty.Optional[int]" = None
     extra_cpu_flags: "tuple[str, ...]" = ()
+    # nvme0 (not virtio0): macOS has a mature *native* NVMe driver (no kext,
+    # no EFI-level virtio driver needed) -- the best-supported disk bus for a
+    # macOS guest, verified against virtio0 working too but relying on
+    # implicit OVMF-level behavior this makes explicit and standard instead.
+    disk_bus: str = "nvme0"
+    # qxl: SPICE-capable, giving a far better remote console (clipboard,
+    # resizing, lower latency) than the default std/vmware VGA + noVNC combo
+    # -- see AGENTS.md for why this doesn't cost any in-guest acceleration
+    # either way (macOS has no native driver for std/vmware/qxl alike without
+    # real GPU passthrough).
+    display: str = "qxl"
+    # Safe to enable even on a single-socket host; only matters if/when the
+    # VM is later pinned to specific NUMA-local cores.
+    numa: bool = True
 
     @property
     def cpu_flags(self) -> "tuple[str, ...]":

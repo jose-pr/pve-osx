@@ -81,6 +81,38 @@ def patch_config(sample_plist_path: str, out_path: str, smbios: "dict[str, _ty.A
         plistlib.dump(config, f)
 
 
+#: Virtio DXE drivers to enable for completeness -- Sample.plist already lists
+#: every one of these (they ship in the same OpenCore release, copied into
+#: Drivers/ alongside everything else) but with Enabled=False. Flipping them
+#: on costs nothing at boot if the corresponding bus isn't actually used (an
+#: unused driver just doesn't find a matching PCI device), and means a VM
+#: profile can freely use virtio for disk/net/scsi/serial without a second
+#: manual step to wire up the matching firmware driver.
+VIRTIO_DRIVERS = (
+    "VirtioBlkDxe.efi",
+    "VirtioNetDxe.efi",
+    "VirtioPciDeviceDxe.efi",
+    "VirtioScsiDxe.efi",
+    "VirtioSerialDxe.efi",
+    "Virtio10.efi",
+    "VirtioGpuDxe.efi",
+)
+
+
+def enable_drivers(config_path: str, names: "_ty.Sequence[str]" = VIRTIO_DRIVERS) -> None:
+    """Flip ``Enabled`` on for the named entries already present in
+    ``UEFI.Drivers`` (in-place on the config.plist at ``config_path``)."""
+    with open(config_path, "rb") as f:
+        config = plistlib.load(f)
+    drivers = config.setdefault("UEFI", {}).setdefault("Drivers", [])
+    by_path = {d.get("Path"): d for d in drivers if isinstance(d, dict)}
+    for name in names:
+        if name in by_path:
+            by_path[name]["Enabled"] = True
+    with open(config_path, "wb") as f:
+        plistlib.dump(config, f)
+
+
 class Efi(PveOsxCmd, Cli):
     """EFI/OpenCore artifact building."""
 
@@ -155,6 +187,7 @@ class EfiBuild(EfiCmd):
 
         config_out = os.path.join(efi_dir, "OC", "config.plist")
         patch_config(sample_plist, config_out, smbios)
+        enable_drivers(config_out)
 
         print(f"EFI folder assembled at: {efi_out}")
         print(f"  model:  {smbios['SystemProductName']}")

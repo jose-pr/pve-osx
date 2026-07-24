@@ -201,6 +201,14 @@ class VmCreate(VmCmd):
     "VM id (defaults to the next free id)"
     ("--vmid",)
 
+    disk_bus: str = "nvme0"
+    "Disk bus for the main disk (nvme0 -- macOS's native NVMe driver, no kext needed)"
+    ("--disk-bus",)
+
+    display: str = "qxl"
+    "Display adapter (qxl enables a SPICE console instead of default+noVNC)"
+    ("--display",)
+
     def __call__(self) -> "int | None":
         from .pve import PveError
         from .profiles import MacOSProfile
@@ -214,6 +222,8 @@ class VmCreate(VmCmd):
             disk_storage=self.disk_storage,
             bridge=self.bridge,
             vlan_tag=self.vlan_tag,
+            disk_bus=self.disk_bus,
+            display=self.display,
         )
 
         pve = self.pve()
@@ -239,13 +249,19 @@ class VmCreate(VmCmd):
                 machine="q35",
                 cores=profile.cores,
                 memory=profile.memory_mb,
+                numa=1 if profile.numa else 0,
                 ostype="other",
                 scsihw="virtio-scsi-pci",
                 net0=profile.net_config(),
                 args=profile.args(),
+                vga=profile.display,
                 efidisk0=f"{profile.efi_storage}:1,pre-enrolled-keys=0",
-                virtio0=f"{profile.disk_storage}:{profile.disk_size_gb},cache=none,discard=on",
-                boot="order=virtio0",
+                **{
+                    profile.disk_bus: (
+                        f"{profile.disk_storage}:{profile.disk_size_gb},cache=none,discard=on"
+                    )
+                },
+                boot=f"order={profile.disk_bus}",
             )
         except PveError:
             self._logger_.error(f"create failed, cleaning up VM {vmid}")
