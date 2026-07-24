@@ -20,6 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   failure instead of leaving it half-configured.
 - `efi build` command: assembles an OpenCore EFI folder from the checksum-verified
   release, generating a fresh SMBIOS identity via the bundled `macserial` and
-  patching it into `config.plist`.
+  patching it into `config.plist`. Also enables every `Virtio*.efi` driver
+  already declared in `Sample.plist` (harmless if the corresponding bus isn't
+  used, forward-compatible if it is).
+- Performance-oriented defaults for `vm create`: `nvme0` as the default disk
+  bus (macOS's native NVMe driver needs no kext, unlike relying on implicit
+  virtio-blk handling), `qxl` display (SPICE console -- no acceleration
+  trade-off for macOS either way without real GPU passthrough), and NUMA
+  enabled.
 
 [Unreleased]: https://github.com/jose-pr/pve-osx/compare/v0.1.0...HEAD

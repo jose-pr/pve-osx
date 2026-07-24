@@ -76,10 +76,21 @@ itself a signal that thing has no REST endpoint.
   `args:` line a macOS guest needs (AppleSMC + USB + CPU flags).
 - **`MacOSProfile(name, macos_version, cores=4, memory_mb=8192,
   disk_size_gb=80, disk_storage="local-zfs", efi_storage="local-zfs",
-  bridge="vmbr0", vlan_tag=None, extra_cpu_flags=())`** — `cores` defaults
-  conservatively (4) since the `kvm-pv-ipi` bug scales with vCPU count.
-  `.cpu_flags` = `DEFAULT_CPU_FLAGS + extra_cpu_flags`; `.args()` renders the
-  full `args:` line for this profile; `.net_config()` renders the `netN` line.
+  bridge="vmbr0", vlan_tag=None, extra_cpu_flags=(), disk_bus="nvme0",
+  display="qxl", numa=True)`** — `cores` defaults conservatively (4) since the
+  `kvm-pv-ipi` bug scales with vCPU count. `disk_bus` defaults to `nvme0`
+  (macOS's native NVMe driver needs no kext/EFI driver at all -- more
+  standard than `virtio0`, which was verified working in practice on
+  2026-07-23 but relies on OVMF's implicit virtio-blk handling rather than a
+  driver macOS actually ships). `display` defaults to `qxl` for a SPICE
+  console (see `pve_osx.efi` note below on why this costs nothing -- macOS
+  has no native accelerated driver for any of `std`/`vmware`/`qxl` without
+  real GPU passthrough, so `qxl` is strictly better for remote-console
+  quality at zero cost). `.cpu_flags` = `DEFAULT_CPU_FLAGS + extra_cpu_flags`;
+  `.args()` renders the full `args:` line for this profile; `.net_config()`
+  renders the `netN` line (always `vmxnet3` -- macOS's *native*
+  `AppleVmxnet3.kext` beats any virtio-net kext, so there's no `net_bus`
+  option to change).
 
 ## Verified downloads (`pve_osx.artifacts`)
 
@@ -120,12 +131,14 @@ onto `Vm`, not the root.
 - **`vm screenshot <vmid> <out>`** — shorthand for the screenshot half of
   `diagnose`.
 - **`vm create <name> [--macos-version --cores --memory --disk-size
-  --disk-storage --bridge --vlan --vmid]`** — builds a `MacOSProfile`,
-  preflights free space on the target storage (raises `SystemExit` rather than
-  attempting a create doomed to run out of room), then `create_vm`; on any
-  `PveError` after the VM is registered, destroys it before re-raising so a
-  failed create never leaves an orphaned VM. Does not yet attach an
-  EFI/installer artifact -- run `efi build` and attach manually.
+  --disk-storage --bridge --vlan --vmid --disk-bus --display]`** — builds a
+  `MacOSProfile`, preflights free space on the target storage (raises
+  `SystemExit` rather than attempting a create doomed to run out of room),
+  then `create_vm` (`vga=<display>`, `numa=1`, main disk on `<disk-bus>=...`,
+  `boot=order=<disk-bus>`); on any `PveError` after the VM is registered,
+  destroys it before re-raising so a failed create never leaves an orphaned
+  VM. Does not yet attach an EFI/installer artifact -- run `efi build` and
+  attach manually.
 
 ## `pve-osx efi ...` (`pve_osx.efi`)
 
@@ -135,14 +148,37 @@ Nested command group (`Efi(PveOsxCmd, duho.Cli)`, `_parsername_ = "efi"`).
   OpenCore release (checksum-verified via `pve_osx.artifacts`), generates a
   fresh SMBIOS identity for `--model` via the bundled `macserial -g` (parses
   its `Serial | MLB` output; `SystemUUID`/`ROM` generated directly via
-  `uuid.uuid4()`/`os.urandom(6)`), and patches those into
-  `PlatformInfo.Generic` of OpenCore's `Docs/Sample.plist`, writing the
-  result to `<out>/EFI/OC/config.plist` alongside the rest of `<out>/EFI/`
-  copied from the release. Does not yet build a FAT/ISO image from that
-  folder -- the printed next step says to write it onto the VM's EFI disk via
-  `mtools`/`mcopy` on the Proxmox host.
+  `uuid.uuid4()`/`os.urandom(6)`), patches those into `PlatformInfo.Generic`
+  of OpenCore's `Docs/Sample.plist`, and enables every `Virtio*.efi` entry
+  already declared (disabled) in `UEFI.Drivers` -- writing the result to
+  `<out>/EFI/OC/config.plist` alongside the rest of `<out>/EFI/` copied from
+  the release (which already includes the Virtio DXE driver files
+  themselves, no separate fetch needed). Does not yet build a FAT/ISO image
+  from that folder -- the printed next step says to write it onto the VM's
+  EFI disk via `mtools`/`mcopy` on the Proxmox host.
 - **`generate_smbios(macserial_path, model) -> dict`**,
   **`patch_config(sample_plist_path, out_path, smbios)`** — the two steps
   above, usable standalone.
+- **`VIRTIO_DRIVERS`** — tuple of `Virtio*.efi` filenames enabled by default
+  (Blk/Net/PciDevice/Scsi/Serial/Virtio10/Gpu) -- enabling an entry whose bus
+  isn't actually used is harmless (it just never matches a PCI device), so
+  this is on unconditionally for forward-compatibility rather than tied to
+  the profile's actual `disk_bus` choice.
+- **`enable_drivers(config_path, names=VIRTIO_DRIVERS)`** — flips `Enabled`
+  on for the named `UEFI.Drivers` entries already present in the plist at
+  `config_path`, in place.
 - **`EfiError`** — raised when the extracted OpenCore archive doesn't have the
   expected layout.
+
+### Why `qxl` costs nothing for macOS
+
+Neither `qxl` nor Proxmox's other display options (`std`, `vmware`) have a
+native macOS guest driver -- without real GPU passthrough, macOS always gets
+an unaccelerated generic framebuffer regardless of which one is picked. So
+`qxl`'s SPICE support (clipboard, dynamic resolution, lower latency than
+noVNC, usable with `remote-viewer`) is a pure win for remote-console quality
+with no acceleration trade-off either way. Real acceleration needs a
+physical GPU dedicated via VFIO passthrough -- out of scope until a host
+actually has a spare GPU (asgard-borr, checked 2026-07-23, has none; its only
+`VGA compatible controller` is the server's Matrox BMC/IPMI chip, not a
+passthrough candidate).
