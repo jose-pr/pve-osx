@@ -38,6 +38,11 @@ class PveOsx(PveOsxCmd, Cli):
 def run(argv: "list[str] | None" = None) -> "int | None":
     import sys
 
+    # Import side effect: each module self-registers its commands onto PveOsx
+    # (or an intermediate group like Vm) at import time.
+    from . import efi as _efi  # noqa: F401
+    from . import vm as _vm  # noqa: F401
+
     if argv is None:
         argv = sys.argv[1:]
     return duho.main(PveOsx, argv)

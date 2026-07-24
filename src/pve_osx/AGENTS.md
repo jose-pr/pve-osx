@@ -80,3 +80,69 @@ itself a signal that thing has no REST endpoint.
   conservatively (4) since the `kvm-pv-ipi` bug scales with vCPU count.
   `.cpu_flags` = `DEFAULT_CPU_FLAGS + extra_cpu_flags`; `.args()` renders the
   full `args:` line for this profile; `.net_config()` renders the `netN` line.
+
+## Verified downloads (`pve_osx.artifacts`)
+
+- **`MANIFEST`** — `dict[str, Artifact(url, sha256, size)]`, pinned
+  releases/refs with real (not placeholder) checksums. Currently one entry,
+  `"opencore-<version>"` — the single OpenCore release zip already bundles
+  `Utilities/macserial` (prebuilt Windows/Linux/macOS) and
+  `Utilities/macrecovery`, so neither needs its own manifest entry or a
+  GenSMBIOS dependency.
+- **`fetch(name, dest, *, force=False) -> str`** — downloads `MANIFEST[name]`
+  to `dest`, verifying sha256; raises `ChecksumMismatchError` (deleting the bad
+  file) on a mismatch. Idempotent: skips re-downloading if `dest` already
+  matches.
+
+## Shared connection args (`pve_osx.common`)
+
+- **`PveConnectionArgs(PveOsxCmd)`** — mixin every Proxmox-talking command
+  extends. Flags: `--host/--node/--token-id/--token-secret/--insecure`
+  (`PveClient`) and `--ssh-host` (`SshClient`), each falling back to the
+  matching `PVE_*` env var. `.pve() -> PveClient`, `.ssh() -> SshClient`
+  (context manager) build the clients from resolved args; both raise
+  `SystemExit` with a clear message if required values are missing.
+
+## `pve-osx vm ...` (`pve_osx.vm`)
+
+Nested command group (`Vm(PveOsxCmd, duho.Cli)`, `_parsername_ = "vm"`).
+`VmCmd(PveConnectionArgs)` is the shared leaf base; `cls._register()` attaches
+onto `Vm`, not the root.
+
+- **`vm list`** — one line per VM: `vmid  name  status  memMB`.
+- **`vm diagnose <vmid> [--screenshot PATH]`** — status + config, a host-side
+  `ps` check (PID/%CPU/elapsed via `SshClient.vm_process_status`), and the
+  **kvm-pv-ipi livelock heuristic**: warns when `args:` lacks `-kvm-pv-ipi`,
+  `cores > 1`, elapsed > 20 minutes, and host CPU > 50% -- the exact signature
+  diagnosed by hand on VM 107 (2026-07-23, livelocked 1d15h at ~20% install
+  progress). `--screenshot foo.ppm` saves raw; any other extension converts
+  via Pillow (`pve-osx[img]`).
+- **`vm screenshot <vmid> <out>`** — shorthand for the screenshot half of
+  `diagnose`.
+- **`vm create <name> [--macos-version --cores --memory --disk-size
+  --disk-storage --bridge --vlan --vmid]`** — builds a `MacOSProfile`,
+  preflights free space on the target storage (raises `SystemExit` rather than
+  attempting a create doomed to run out of room), then `create_vm`; on any
+  `PveError` after the VM is registered, destroys it before re-raising so a
+  failed create never leaves an orphaned VM. Does not yet attach an
+  EFI/installer artifact -- run `efi build` and attach manually.
+
+## `pve-osx efi ...` (`pve_osx.efi`)
+
+Nested command group (`Efi(PveOsxCmd, duho.Cli)`, `_parsername_ = "efi"`).
+
+- **`efi build [--out --model --opencore --cache-dir]`** — fetches the pinned
+  OpenCore release (checksum-verified via `pve_osx.artifacts`), generates a
+  fresh SMBIOS identity for `--model` via the bundled `macserial -g` (parses
+  its `Serial | MLB` output; `SystemUUID`/`ROM` generated directly via
+  `uuid.uuid4()`/`os.urandom(6)`), and patches those into
+  `PlatformInfo.Generic` of OpenCore's `Docs/Sample.plist`, writing the
+  result to `<out>/EFI/OC/config.plist` alongside the rest of `<out>/EFI/`
+  copied from the release. Does not yet build a FAT/ISO image from that
+  folder -- the printed next step says to write it onto the VM's EFI disk via
+  `mtools`/`mcopy` on the Proxmox host.
+- **`generate_smbios(macserial_path, model) -> dict`**,
+  **`patch_config(sample_plist_path, out_path, smbios)`** — the two steps
+  above, usable standalone.
+- **`EfiError`** — raised when the extracted OpenCore archive doesn't have the
+  expected layout.

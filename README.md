@@ -44,7 +44,8 @@ Optional features/extras:
 | --- | --- | --- |
 | `api` | `proxmoxer`, `requests` | Everything with a Proxmox REST endpoint (VM create/config, storage upload) |
 | `ssh` | `paramiko` | The few operations the API can't do (`qm monitor` screendump) |
-| `all` | both of the above | Full functionality |
+| `img` | `Pillow` | Saving a screenshot as anything but raw `.ppm` |
+| `all` | all of the above | Full functionality |
 
 ## Quick start
 
