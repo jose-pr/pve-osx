@@ -54,5 +54,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   including the stderr that `capture_output=True` was swallowing -- instead of
   a bare `CalledProcessError` traceback, and reports unparseable output rather
   than raising `StopIteration`.
+- `artifacts.fetch` now verifies the manifest's declared byte count as well as
+  its sha256. `Artifact.size` was recorded and never checked; checking it
+  first aborts a truncated download on a stat rather than after hashing.
+- `vm create`'s log line no longer prints the vmid twice ("Creating VM 107 ...
+  on vmid 107"); it reports the profile's resources instead.
 
 [Unreleased]: https://github.com/jose-pr/pve-osx/compare/v0.1.0...HEAD

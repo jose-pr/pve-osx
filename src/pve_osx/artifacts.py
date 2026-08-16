@@ -89,19 +89,35 @@ def _sha256(path: str) -> str:
 
 
 def fetch(name: str, dest: str, *, force: bool = False) -> str:
-    """Download ``MANIFEST[name]`` to ``dest``, verifying its sha256.
+    """Download ``MANIFEST[name]`` to ``dest``, verifying its size and sha256.
 
-    Raises :class:`ChecksumMismatchError` (and deletes the bad file) on a
-    mismatch -- never returns a path to unverified content. Skips the
-    download if ``dest`` already exists and already matches the checksum
-    (idempotent re-runs); pass ``force=True`` to re-download regardless.
+    Raises :class:`ChecksumMismatchError` (and deletes the bad file) if either
+    the byte count or the digest disagrees with the manifest -- never returns
+    a path to unverified content. The size is checked first: it is a stat
+    call, so a truncated or wrong download aborts without hashing megabytes
+    to reach the same conclusion. Skips the download if ``dest`` already
+    matches (idempotent re-runs); pass ``force=True`` to re-download
+    regardless.
     """
     artifact = MANIFEST[name]
-    if not force and os.path.exists(dest) and _sha256(dest) == artifact.sha256:
+    if (
+        not force
+        and os.path.exists(dest)
+        and os.path.getsize(dest) == artifact.size
+        and _sha256(dest) == artifact.sha256
+    ):
         return dest
 
     tmp = f"{dest}.part"
     urllib.request.urlretrieve(artifact.url, tmp)
+
+    actual_size = os.path.getsize(tmp)
+    if actual_size != artifact.size:
+        os.remove(tmp)
+        raise ChecksumMismatchError(
+            f"{name}: expected {artifact.size} bytes, got {actual_size} "
+            "-- refusing to use it"
+        )
     actual = _sha256(tmp)
     if actual != artifact.sha256:
         os.remove(tmp)

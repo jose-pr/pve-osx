@@ -103,9 +103,11 @@ itself a signal that thing has no REST endpoint.
   `Utilities/macrecovery`, so neither needs its own manifest entry or a
   GenSMBIOS dependency.
 - **`fetch(name, dest, *, force=False) -> str`** — downloads `MANIFEST[name]`
-  to `dest`, verifying sha256; raises `ChecksumMismatchError` (deleting the bad
-  file) on a mismatch. Idempotent: skips re-downloading if `dest` already
-  matches.
+  to `dest`, verifying **both** `size` and `sha256`; raises
+  `ChecksumMismatchError` (deleting the bad file) on either mismatch. Size is
+  checked first, so a truncated download aborts on a stat instead of hashing
+  megabytes to reach the same answer. Idempotent: skips re-downloading if
+  `dest` already matches.
 
 ## Shared connection args (`pve_osx.common`)
 

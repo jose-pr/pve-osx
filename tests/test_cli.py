@@ -11,7 +11,12 @@ def test_help_exits_zero(capsys):
 
 
 def test_version_matches_package():
+    """`__version__` must agree with the version the build backend recorded --
+    pinning a literal here just meant the test had to be edited on every bump,
+    which is exactly when a drifted `__version__` would go unnoticed."""
+    from importlib.metadata import version
+
     from pve_osx import __version__
 
     assert PveOsx._version_ is not None
-    assert __version__ == "0.1.0"
+    assert __version__ == version("pve-osx")

@@ -242,7 +242,11 @@ class VmCreate(VmCmd):
             )
 
         vmid = self.vmid or pve.next_id()
-        self._logger_.info(f"Creating VM {vmid} ({profile.name}) on vmid {vmid}")
+        self._logger_.info(
+            f"Creating VM {vmid} ({profile.name}): {profile.cores} vCPU, "
+            f"{profile.memory_mb}MB, {profile.disk_size_gb}GB on "
+            f"{profile.disk_storage} via {profile.disk_bus}"
+        )
         try:
             pve.create_vm(
                 vmid,
