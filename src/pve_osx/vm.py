@@ -205,8 +205,10 @@ class VmCreate(VmCmd):
     "Disk bus for the main disk (nvme0 -- macOS's native NVMe driver, no kext needed)"
     ("--disk-bus",)
 
-    display: str = "qxl"
-    "Display adapter (qxl enables a SPICE console instead of default+noVNC)"
+    display: str = "vmware"
+    "Display adapter (vmware is the default: empirically the best-rendering "
+    "option for a macOS guest, and gets vga memory bumped to 128MB; qxl swaps "
+    "in a SPICE console instead of default+noVNC, at visibly worse quality)"
     ("--display",)
 
     def __call__(self) -> "int | None":
@@ -254,7 +256,7 @@ class VmCreate(VmCmd):
                 scsihw="virtio-scsi-pci",
                 net0=profile.net_config(),
                 args=profile.args(),
-                vga=profile.display,
+                vga=f"{profile.display},memory=128" if profile.display == "vmware" else profile.display,
                 # type=isa: the community mac-guest-agent needs an ISA-serial
                 # channel -- Proxmox's default (virtio-serial) makes it
                 # crash-loop on every connect attempt (diagnosed live,

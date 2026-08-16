@@ -25,8 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   used, forward-compatible if it is).
 - Performance-oriented defaults for `vm create`: `nvme0` as the default disk
   bus (macOS's native NVMe driver needs no kext, unlike relying on implicit
-  virtio-blk handling), `qxl` display (SPICE console -- no acceleration
-  trade-off for macOS either way without real GPU passthrough), NUMA enabled,
+  virtio-blk handling), `vmware` display with `memory=128` (measured on a real
+  macOS guest to render the desktop correctly with much less input lag, where
+  `qxl` gave a near-white, laggy console -- this reverses an earlier
+  theoretical assumption that the choice could not matter), NUMA enabled,
   and `vmware-cpuid-freq=on` added to the default CPU flags (cross-referenced
   against three independent macOS-on-Proxmox write-ups).
 - `efi build` now fetches and installs the four standard kexts

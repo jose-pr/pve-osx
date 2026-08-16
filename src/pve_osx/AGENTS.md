@@ -80,16 +80,15 @@ itself a signal that thing has no REST endpoint.
 - **`MacOSProfile(name, macos_version, cores=4, memory_mb=8192,
   disk_size_gb=80, disk_storage="local-zfs", efi_storage="local-zfs",
   bridge="vmbr0", vlan_tag=None, extra_cpu_flags=(), disk_bus="nvme0",
-  display="qxl", numa=True)`** — `cores` defaults conservatively (4) since the
-  `kvm-pv-ipi` bug scales with vCPU count. `disk_bus` defaults to `nvme0`
+  display="vmware", numa=True)`** — `cores` defaults conservatively (4) since
+  the `kvm-pv-ipi` bug scales with vCPU count. `disk_bus` defaults to `nvme0`
   (macOS's native NVMe driver needs no kext/EFI driver at all -- more
   standard than `virtio0`, which was verified working in practice on
   2026-07-23 but relies on OVMF's implicit virtio-blk handling rather than a
-  driver macOS actually ships). `display` defaults to `qxl` for a SPICE
-  console (see `pve_osx.efi` note below on why this costs nothing -- macOS
-  has no native accelerated driver for any of `std`/`vmware`/`qxl` without
-  real GPU passthrough, so `qxl` is strictly better for remote-console
-  quality at zero cost). `.cpu_flags` = `DEFAULT_CPU_FLAGS + extra_cpu_flags`;
+  driver macOS actually ships). `display` defaults to `vmware`, which renders
+  macOS visibly better than `qxl` (see the note below -- this is an empirical
+  result that overrode the opposite theoretical expectation).
+  `.cpu_flags` = `DEFAULT_CPU_FLAGS + extra_cpu_flags`;
   `.args()` renders the full `args:` line for this profile; `.net_config()`
   renders the `netN` line (always `vmxnet3` -- macOS's *native*
   `AppleVmxnet3.kext` beats any virtio-net kext, so there's no `net_bus`
@@ -137,7 +136,8 @@ onto `Vm`, not the root.
   --disk-storage --bridge --vlan --vmid --disk-bus --display]`** — builds a
   `MacOSProfile`, preflights free space on the target storage (raises
   `SystemExit` rather than attempting a create doomed to run out of room),
-  then `create_vm` (`vga=<display>`, `numa=1`, `agent=enabled=1,type=isa`,
+  then `create_vm` (`vga=<display>`, or `vga=vmware,memory=128` for the
+  default `vmware` display; `numa=1`, `agent=enabled=1,type=isa`,
   main disk on `<disk-bus>=...`, `boot=order=<disk-bus>`); on any `PveError`
   after the VM is registered, destroys it before re-raising so a failed
   create never leaves an orphaned VM. Does not yet attach an EFI/installer
@@ -219,15 +219,24 @@ Nested command group (`Efi(PveOsxCmd, duho.Cli)`, `_parsername_ = "efi"`).
 - **`EfiError`** — raised when the extracted OpenCore archive doesn't have the
   expected layout.
 
-### Why `qxl` costs nothing for macOS
+### Why the display default is `vmware`, not `qxl`
 
-Neither `qxl` nor Proxmox's other display options (`std`, `vmware`) have a
-native macOS guest driver -- without real GPU passthrough, macOS always gets
-an unaccelerated generic framebuffer regardless of which one is picked. So
-`qxl`'s SPICE support (clipboard, dynamic resolution, lower latency than
-noVNC, usable with `remote-viewer`) is a pure win for remote-console quality
-with no acceleration trade-off either way. Real acceleration needs a
-physical GPU dedicated via VFIO passthrough -- out of scope until a host
-actually has a spare GPU (pve-host, checked 2026-07-23, has none; its only
-`VGA compatible controller` is the server's Matrox BMC/IPMI chip, not a
-passthrough candidate).
+Measured on a real macOS guest (2026-07-23): `vmware` renders the desktop
+correctly with much less input lag, while `qxl` gives a near-white screen and
+a laggy console. That is an *empirical* result and it overrode the opposite
+theoretical expectation -- "none of `std`/`vmware`/`qxl` has a native macOS
+driver, so the pick shouldn't matter, and `qxl` buys a SPICE console for
+free". It does matter; macOS's framebuffer/GOP compatibility path evidently
+handles VMware's long-standard SVGA emulation more completely than QXL's.
+Trust the measurement over the theory if they ever conflict again.
+
+`vm create` also bumps the adapter's VGA memory to 128MB (`vga=vmware,memory=128`)
+when the display is `vmware`, which is what allows the higher console
+resolutions. Passing `--display qxl` is still supported if you specifically
+want SPICE (clipboard, dynamic resolution, `remote-viewer`) and can live with
+the rendering.
+
+Neither option is accelerated: real acceleration needs a physical GPU dedicated
+via VFIO passthrough, which is out of scope until the PVE host actually has a
+spare GPU to give (a server whose only `VGA compatible controller` is the
+Matrox BMC/IPMI chip has nothing to pass through).

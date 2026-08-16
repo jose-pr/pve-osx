@@ -78,12 +78,16 @@ class MacOSProfile:
     # macOS guest, verified against virtio0 working too but relying on
     # implicit OVMF-level behavior this makes explicit and standard instead.
     disk_bus: str = "nvme0"
-    # qxl: SPICE-capable, giving a far better remote console (clipboard,
-    # resizing, lower latency) than the default std/vmware VGA + noVNC combo
-    # -- see AGENTS.md for why this doesn't cost any in-guest acceleration
-    # either way (macOS has no native driver for std/vmware/qxl alike without
-    # real GPU passthrough).
-    display: str = "qxl"
+    # vmware (not qxl): empirically verified on real hardware (VM 107,
+    # 2026-07-23) to render noticeably better for macOS specifically --
+    # actual desktop background visible and much less input lag, vs qxl's
+    # near-white screen and laggy response. This reverses an earlier
+    # theoretical assumption ("neither has a real macOS driver so it
+    # shouldn't matter") that turned out to be wrong in practice, likely
+    # because macOS's framebuffer/GOP compatibility path handles VMware's
+    # long-standard SVGA emulation more completely than QXL's. Trust this
+    # empirical result over the theoretical one if they ever conflict again.
+    display: str = "vmware"
     # Safe to enable even on a single-socket host; only matters if/when the
     # VM is later pinned to specific NUMA-local cores.
     numa: bool = True
