@@ -37,7 +37,9 @@ DEFAULT_CPU_FLAGS: "tuple[str, ...]" = (
 )
 
 
-def cpu_arg(flags: "_ty.Sequence[str]" = DEFAULT_CPU_FLAGS, *, base: str = "host") -> str:
+def cpu_arg(
+    flags: "_ty.Sequence[str]" = DEFAULT_CPU_FLAGS, *, base: str = "host"
+) -> str:
     """Render the ``-cpu`` QEMU argument value for a macOS guest."""
     return ",".join((base, *flags))
 
@@ -64,8 +66,10 @@ class MacOSProfile:
     """
 
     name: str
-    macos_version: str  # e.g. "sequoia", "sonoma" -- used to pick the OpenCore/recovery artifact
-    cores: int = 4  # deliberately conservative default; the kvm-pv-ipi bug scales with vCPU count
+    # e.g. "sequoia", "sonoma" -- picks the OpenCore/recovery artifact
+    macos_version: str
+    # Deliberately conservative: the kvm-pv-ipi bug scales with vCPU count.
+    cores: int = 4
     memory_mb: int = 8192
     disk_size_gb: int = 80
     disk_storage: str = "local-zfs"
@@ -97,8 +101,10 @@ class MacOSProfile:
         return DEFAULT_CPU_FLAGS + self.extra_cpu_flags
 
     def args(self) -> str:
-        return qemu_args() if not self.extra_cpu_flags else (
-            qemu_args().rsplit("-cpu ", 1)[0] + f"-cpu {cpu_arg(self.cpu_flags)}"
+        return (
+            qemu_args()
+            if not self.extra_cpu_flags
+            else (qemu_args().rsplit("-cpu ", 1)[0] + f"-cpu {cpu_arg(self.cpu_flags)}")
         )
 
     def net_config(self) -> str:

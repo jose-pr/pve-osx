@@ -137,7 +137,9 @@ def test_generate_smbios_rejects_unparseable_output(monkeypatch):
     monkeypatch.setattr(
         subprocess,
         "run",
-        lambda *a, **k: subprocess.CompletedProcess(a[0], 0, stdout="nothing here\n", stderr=""),
+        lambda *a, **k: subprocess.CompletedProcess(
+            a[0], 0, stdout="nothing here\n", stderr=""
+        ),
     )
 
     with pytest.raises(efi.EfiError) as exc:

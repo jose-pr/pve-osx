@@ -45,7 +45,9 @@ class VmList(VmCmd):
     def __call__(self) -> "int | None":
         pve = self.pve()
         for v in sorted(pve.list_vms(), key=lambda v: v["vmid"]):
-            print(f"{v['vmid']}\t{v['name']}\t{v['status']}\t{v.get('mem', 0) // (1024*1024)}MB")
+            print(
+                f"{v['vmid']}\t{v['name']}\t{v['status']}\t{v.get('mem', 0) // (1024*1024)}MB"
+            )
         return 0
 
 
@@ -260,7 +262,11 @@ class VmCreate(VmCmd):
                 scsihw="virtio-scsi-pci",
                 net0=profile.net_config(),
                 args=profile.args(),
-                vga=f"{profile.display},memory=128" if profile.display == "vmware" else profile.display,
+                vga=(
+                    f"{profile.display},memory=128"
+                    if profile.display == "vmware"
+                    else profile.display
+                ),
                 # type=isa: the community mac-guest-agent needs an ISA-serial
                 # channel -- Proxmox's default (virtio-serial) makes it
                 # crash-loop on every connect attempt (diagnosed live,

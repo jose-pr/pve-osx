@@ -115,7 +115,9 @@ def generate_smbios(macserial_path: str, model: str) -> "dict[str, _ty.Any]":
     }
 
 
-def patch_config(sample_plist_path: str, out_path: str, smbios: "dict[str, _ty.Any]") -> None:
+def patch_config(
+    sample_plist_path: str, out_path: str, smbios: "dict[str, _ty.Any]"
+) -> None:
     """Load ``Sample.plist``, apply ``smbios`` into ``PlatformInfo.Generic``, save to ``out_path``."""
     with open(sample_plist_path, "rb") as f:
         config = plistlib.load(f)
@@ -143,7 +145,9 @@ VIRTIO_DRIVERS = (
 )
 
 
-def enable_drivers(config_path: str, names: "_ty.Sequence[str]" = VIRTIO_DRIVERS) -> None:
+def enable_drivers(
+    config_path: str, names: "_ty.Sequence[str]" = VIRTIO_DRIVERS
+) -> None:
     """Flip ``Enabled`` on for the named entries already present in
     ``UEFI.Drivers`` (in-place on the config.plist at ``config_path``)."""
     with open(config_path, "rb") as f:
@@ -297,7 +301,9 @@ class EfiBuild(EfiCmd):
         artifacts.fetch(self.opencore_artifact, zip_path)
 
         extracted = _extract_opencore(zip_path, os.path.join(cache, "opencore"))
-        macserial = os.path.join(extracted, "Utilities", "macserial", _macserial_binary_name())
+        macserial = os.path.join(
+            extracted, "Utilities", "macserial", _macserial_binary_name()
+        )
         sample_plist = os.path.join(extracted, "Docs", "Sample.plist")
         if not os.path.exists(macserial) or not os.path.exists(sample_plist):
             raise EfiError(
@@ -318,7 +324,9 @@ class EfiBuild(EfiCmd):
         enable_drivers(config_out)
         add_kernel_entries(config_out)
 
-        self._logger_.info("Fetching and installing standard kexts (checksum-verified)...")
+        self._logger_.info(
+            "Fetching and installing standard kexts (checksum-verified)..."
+        )
         install_kexts(cache, os.path.join(efi_dir, "OC", "Kexts"))
 
         print(f"EFI folder assembled at: {efi_out}")
@@ -326,7 +334,9 @@ class EfiBuild(EfiCmd):
         print(f"  serial: {smbios['SystemSerialNumber']}")
         print(f"  mlb:    {smbios['MLB']}")
         print(f"  uuid:   {smbios['SystemUUID']}")
-        print(f"  kexts:  {', '.join(sorted(os.listdir(os.path.join(efi_dir, 'OC', 'Kexts'))))}")
+        print(
+            f"  kexts:  {', '.join(sorted(os.listdir(os.path.join(efi_dir, 'OC', 'Kexts'))))}"
+        )
         print(
             "next step: write this EFI/ folder onto the VM's EFI disk (e.g. via "
             "mtools/mcopy on the Proxmox host) -- pve-osx does not build a FAT/ISO "

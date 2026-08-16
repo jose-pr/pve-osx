@@ -54,7 +54,9 @@ class PveConnectionArgs(PveOsxCmd):
                 "pve-osx: no API token given (--token-id/--token-secret or "
                 "$PVE_TOKEN_ID/$PVE_TOKEN_SECRET)"
             )
-        verify_ssl = not self.insecure and os.environ.get("PVE_VERIFY_SSL", "false").lower() in (
+        verify_ssl = not self.insecure and os.environ.get(
+            "PVE_VERIFY_SSL", "false"
+        ).lower() in (
             "1",
             "true",
             "yes",
@@ -70,9 +72,14 @@ class PveConnectionArgs(PveOsxCmd):
     def ssh(self):
         from .ssh import SshClient
 
-        host = self.ssh_host or os.environ.get("PVE_SSH_HOST") or self.host or os.environ.get(
-            "PVE_HOST"
+        host = (
+            self.ssh_host
+            or os.environ.get("PVE_SSH_HOST")
+            or self.host
+            or os.environ.get("PVE_HOST")
         )
         if not host:
-            raise SystemExit("pve-osx: no SSH host given (--ssh-host, $PVE_SSH_HOST, or --host)")
+            raise SystemExit(
+                "pve-osx: no SSH host given (--ssh-host, $PVE_SSH_HOST, or --host)"
+            )
         return SshClient(host)
