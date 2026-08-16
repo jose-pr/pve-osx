@@ -183,7 +183,10 @@ Nested command group (`Efi(PveOsxCmd, duho.Cli)`, `_parsername_ = "efi"`).
   onto the VM's EFI disk via `mtools`/`mcopy` on the Proxmox host.
 - **`generate_smbios(macserial_path, model) -> dict`**,
   **`patch_config(sample_plist_path, out_path, smbios)`** — the two steps
-  above, usable standalone.
+  above, usable standalone. `generate_smbios` raises `EfiError` for every
+  macserial failure mode (non-zero exit — with its stderr, which
+  `capture_output=True` would otherwise swallow; an unrunnable binary; output
+  with no `Serial | MLB` line), never a raw `CalledProcessError` or `OSError`.
 - **`VIRTIO_DRIVERS`** — tuple of `Virtio*.efi` filenames enabled by default
   (Blk/Net/PciDevice/Scsi/Serial/Virtio10/Gpu) -- enabling an entry whose bus
   isn't actually used is harmless (it just never matches a PCI device), so
@@ -217,7 +220,16 @@ Nested command group (`Efi(PveOsxCmd, duho.Cli)`, `_parsername_ = "efi"`).
   PerfPowerServices_*.cpu_resource.diag` -- macOS's own automatic
   excessive-CPU watchdog report).
 - **`EfiError`** — raised when the extracted OpenCore archive doesn't have the
-  expected layout.
+  expected layout, and for any macserial failure (see `generate_smbios`).
+
+### Extraction drops the exec bit
+
+`zipfile.extractall` ignores `ZipInfo.external_attr`, so nothing extracted
+from a zip is executable on Linux/macOS. `efi build` chmods the extracted
+`Utilities/macserial/macserial*` back to `0755` for exactly this reason —
+without it, `generate_smbios` hits `PermissionError` on every non-Windows
+host. The kexts installed by `install_kexts` are deliberately *not* chmod'ed:
+they end up on the FAT EFI partition, which has no exec bit to preserve.
 
 ### Why the display default is `vmware`, not `qxl`
 

@@ -44,4 +44,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   Login, enable Screen Sharing persistently, install/upgrade
   `mac-guest-agent`, checksum-verified and idempotent).
 
+### Fixed
+
+- `efi build` no longer fails on Linux/macOS: `zipfile.extractall` never
+  restores POSIX permissions, so the `macserial` binary extracted from the
+  OpenCore release landed non-executable and running it raised
+  `PermissionError`. Only a Windows-only development box hid this.
+- `generate_smbios` now raises `EfiError` for every macserial failure --
+  including the stderr that `capture_output=True` was swallowing -- instead of
+  a bare `CalledProcessError` traceback, and reports unparseable output rather
+  than raising `StopIteration`.
+
 [Unreleased]: https://github.com/jose-pr/pve-osx/compare/v0.1.0...HEAD

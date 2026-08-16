@@ -36,12 +36,38 @@ def _macserial_binary_name() -> str:
     return "macserial"  # Darwin
 
 
+def _restore_macserial_exec_bit(dest: str) -> "list[str]":
+    """Make the extracted ``Utilities/macserial/`` binaries executable again.
+
+    ``zipfile.extractall`` never restores POSIX permissions (documented stdlib
+    behavior -- ``ZipInfo.external_attr`` is ignored on extract), so every
+    extracted file lands mode 0644 and running ``macserial`` raises
+    ``PermissionError`` on Linux/macOS. Windows has no exec bit at all, which
+    is the only reason this was not noticed sooner.
+
+    Returns the paths chmod'ed, in sorted order. Only ``macserial*`` is
+    handled: the kext executables extracted by :func:`install_kexts` end up on
+    the FAT EFI partition, which drops the bit anyway.
+    """
+    tools_dir = os.path.join(dest, "Utilities", "macserial")
+    chmoded = []
+    if not os.path.isdir(tools_dir):
+        return chmoded
+    for entry in sorted(os.listdir(tools_dir)):
+        path = os.path.join(tools_dir, entry)
+        if entry.startswith("macserial") and os.path.isfile(path):
+            os.chmod(path, 0o755)
+            chmoded.append(path)
+    return chmoded
+
+
 def _extract_opencore(zip_path: str, dest: str) -> str:
     """Extract the OpenCore release zip to ``dest``, returning its path."""
     if os.path.isdir(dest):
         shutil.rmtree(dest)
     with zipfile.ZipFile(zip_path) as z:
         z.extractall(dest)
+    _restore_macserial_exec_bit(dest)
     return dest
 
 
@@ -51,16 +77,34 @@ def generate_smbios(macserial_path: str, model: str) -> "dict[str, _ty.Any]":
     Returns the ``PlatformInfo.Generic`` fields OpenCore expects:
     ``SystemProductName``, ``SystemSerialNumber``, ``MLB``, ``SystemUUID``,
     ``ROM``.
+
+    Raises :class:`EfiError` (never a raw ``CalledProcessError``) if macserial
+    fails or prints something unparseable -- ``capture_output=True`` otherwise
+    swallows the stderr that says why.
     """
     import subprocess
 
-    out = subprocess.run(
-        [macserial_path, "-g", "-m", model, "-n", "1"],
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout
-    line = next(l for l in out.splitlines() if "|" in l)
+    try:
+        out = subprocess.run(
+            [macserial_path, "-g", "-m", model, "-n", "1"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+    except subprocess.CalledProcessError as e:
+        raise EfiError(
+            f"macserial failed for model {model!r} (exit {e.returncode}): "
+            f"{(e.stderr or '').strip() or '<no stderr>'}"
+        ) from e
+    except OSError as e:
+        raise EfiError(f"could not run macserial at {macserial_path}: {e}") from e
+
+    line = next((l for l in out.splitlines() if "|" in l), None)
+    if line is None:
+        raise EfiError(
+            f"macserial produced no 'Serial | MLB' line for model {model!r}; "
+            f"got: {out.strip() or '<empty>'}"
+        )
     serial, mlb = (part.strip() for part in line.split("|", 1))
     return {
         "SystemProductName": model,
