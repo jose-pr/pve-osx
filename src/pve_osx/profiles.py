@@ -1,7 +1,7 @@
 """macOS VM profile definitions and hardened QEMU CPU-flag defaults.
 
 The default CPU-flag preset bakes in a fix discovered diagnosing a real hung
-install (VM 107 on pve-host, 2026-07-23): ``kvm-pv-ipi`` left enabled on a
+install (VM 107 on the PVE host, 2026-07-23): ``kvm-pv-ipi`` left enabled on a
 16-vCPU macOS guest causes a livelock where vCPUs spin at high CPU while the
 installer barely advances (that VM sat at ~20% progress for 1 day 15 hours).
 Disabling it (``-kvm-pv-ipi``) is a known fix for multi-vCPU macOS guests under

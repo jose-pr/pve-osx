@@ -71,8 +71,8 @@ class SshClient:
         # literally (as opposed to the HostName it resolves to) both fails
         # DNS and, even if it resolved, would look up the wrong known_hosts
         # entry (recorded under the real host, not the alias). Resolve the
-        # alias ourselves first so `SshClient("pve-host")` behaves the way
-        # `ssh pve-host` already does for the user.
+        # alias ourselves first so `SshClient("my-pve-host")` behaves the way
+        # `ssh my-pve-host` already does for the user.
         resolved_host, resolved_user, resolved_port, identities = host, user, port, []
         cfg_path = config_path or os.path.expanduser("~/.ssh/config")
         if os.path.exists(cfg_path):
