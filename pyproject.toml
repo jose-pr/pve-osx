@@ -27,7 +27,7 @@ classifiers = [
     "Topic :: System :: Systems Administration",
     "Typing :: Typed",
 ]
-dependencies = ["duho>=0.3.2"]
+dependencies = ["duho>=0.6.0,<0.7"]
 
 [project.optional-dependencies]
 api = ["proxmoxer", "requests"]

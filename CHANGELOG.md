@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- Bumped the `duho` dependency floor to `>=0.6.0,<0.7` (was the unbounded
+  `>=0.3.2`). Pre-1.0, a duho minor bump is a documented API break by
+  convention, so pinning to the version actually verified closes the
+  auto-adopt gap; no source changes were needed for 0.6.0 itself.
+
 ### Added
 
 - Initial rewrite of OSX-PROXMOX as a Python/duho package: remote-first CLI
