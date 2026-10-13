@@ -9,10 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-- Bumped the `duho` dependency floor to `>=0.6.0,<0.7` (was the unbounded
+- Bumped the `duho` dependency to `>=0.7.3,<0.8` (was the unbounded
   `>=0.3.2`). Pre-1.0, a duho minor bump is a documented API break by
-  convention, so pinning to the version actually verified closes the
-  auto-adopt gap; no source changes were needed for 0.6.0 itself.
+  convention, so pinning to the series actually verified closes the
+  auto-adopt gap. No source changes were needed: every command, flag and
+  default is unchanged.
 
 ### Added
 
