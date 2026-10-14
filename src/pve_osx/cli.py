@@ -40,6 +40,8 @@ class PveOsx(PveOsxCmd, Cli):
 
 
 def run(argv: "list[str] | None" = None) -> int:
+    """Entry point: return the status; ``--help``, ``--version`` and a usage error
+    raise ``SystemExit``."""
     # Import side effect: each module self-registers its commands onto PveOsx
     # (or an intermediate group like Vm) at import time.
     from . import efi as _efi  # noqa: F401
@@ -47,4 +49,4 @@ def run(argv: "list[str] | None" = None) -> int:
 
     if argv is None:
         argv = sys.argv[1:]
-    return duho.run(PveOsx, argv, exit=False)
+    return duho.run(PveOsx, argv, exit="parse")
