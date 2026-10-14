@@ -5,7 +5,7 @@ from __future__ import annotations
 import typing as _ty
 
 import duho
-from duho import Cli
+from duho import Cli, CommandError
 
 from .cli import PveOsx, PveOsxCmd
 from .common import PveConnectionArgs
@@ -121,7 +121,7 @@ class VmDiagnose(VmCmd):
 
             from PIL import Image
         except ImportError as e:
-            raise SystemExit(
+            raise CommandError(
                 "pve-osx: saving as anything but .ppm needs Pillow "
                 "(pip install 'pve-osx[img]'), or pass a .ppm path"
             ) from e
@@ -237,7 +237,7 @@ class VmCreate(VmCmd):
         status = pve.storage_status(profile.disk_storage)
         needed = profile.disk_size_gb * 1024**3
         if status.available_bytes < needed:
-            raise SystemExit(
+            raise CommandError(
                 f"pve-osx: storage '{profile.disk_storage}' has "
                 f"{status.available_bytes / 1024**3:.1f}GB free, need "
                 f"{profile.disk_size_gb}GB -- refusing to create"
@@ -346,7 +346,7 @@ class VmProvision(VmCmd):
             try:
                 ssh.run("sudo -n true")
             except SshError as e:
-                raise SystemExit(
+                raise CommandError(
                     f"pve-osx: passwordless sudo required for {self.guest_user} -- "
                     "run this once yourself in the guest: echo "
                     f"'{self.guest_user} ALL=(ALL) NOPASSWD: ALL' | sudo tee "

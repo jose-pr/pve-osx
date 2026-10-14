@@ -116,7 +116,7 @@ itself a signal that thing has no REST endpoint.
   (`PveClient`) and `--ssh-host` (`SshClient`), each falling back to the
   matching `PVE_*` env var. `.pve() -> PveClient`, `.ssh() -> SshClient`
   (context manager) build the clients from resolved args; both raise
-  `SystemExit` with a clear message if required values are missing.
+  `duho.CommandError` with a clear message if required values are missing.
 
 ## `pve-osx vm ...` (`pve_osx.vm`)
 
@@ -137,7 +137,7 @@ onto `Vm`, not the root.
 - **`vm create <name> [--macos-version --cores --memory --disk-size
   --disk-storage --bridge --vlan --vmid --disk-bus --display]`** — builds a
   `MacOSProfile`, preflights free space on the target storage (raises
-  `SystemExit` rather than attempting a create doomed to run out of room),
+  `duho.CommandError` rather than attempting a create doomed to run out of room),
   then `create_vm` (`vga=<display>`, or `vga=vmware,memory=128` for the
   default `vmware` display; `numa=1`, `agent=enabled=1,type=isa`,
   main disk on `<disk-bus>=...`, `boot=order=<disk-bus>`); on any `PveError`

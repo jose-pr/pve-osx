@@ -11,6 +11,8 @@ from __future__ import annotations
 import os
 import typing as _ty
 
+from duho import CommandError
+
 from .cli import PveOsxCmd
 
 
@@ -46,11 +48,11 @@ class PveConnectionArgs(PveOsxCmd):
 
         host = self.host or os.environ.get("PVE_HOST")
         if not host:
-            raise SystemExit("pve-osx: no Proxmox host given (--host or $PVE_HOST)")
+            raise CommandError("pve-osx: no Proxmox host given (--host or $PVE_HOST)")
         token_id = self.token_id or os.environ.get("PVE_TOKEN_ID")
         token_secret = self.token_secret or os.environ.get("PVE_TOKEN_SECRET")
         if not token_id or not token_secret:
-            raise SystemExit(
+            raise CommandError(
                 "pve-osx: no API token given (--token-id/--token-secret or "
                 "$PVE_TOKEN_ID/$PVE_TOKEN_SECRET)"
             )
@@ -79,7 +81,7 @@ class PveConnectionArgs(PveOsxCmd):
             or os.environ.get("PVE_HOST")
         )
         if not host:
-            raise SystemExit(
+            raise CommandError(
                 "pve-osx: no SSH host given (--ssh-host, $PVE_SSH_HOST, or --host)"
             )
         return SshClient(host)

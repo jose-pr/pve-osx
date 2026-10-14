@@ -7,6 +7,8 @@ their own modules -- this module only defines the app root.
 
 from __future__ import annotations
 
+import sys
+
 import duho
 from duho import Cli, LoggingArgs
 
@@ -33,11 +35,11 @@ class PveOsx(PveOsxCmd, Cli):
     _version_ = duho.AUTO
     _distribution_ = "pve-osx"
     _completion_ = True
+    # Error messages already carry the "pve-osx:" prefix: print them unchanged.
+    _report_error_ = staticmethod(lambda message, code: print(message, file=sys.stderr))
 
 
-def run(argv: "list[str] | None" = None) -> "int | None":
-    import sys
-
+def run(argv: "list[str] | None" = None) -> int:
     # Import side effect: each module self-registers its commands onto PveOsx
     # (or an intermediate group like Vm) at import time.
     from . import efi as _efi  # noqa: F401
@@ -45,4 +47,4 @@ def run(argv: "list[str] | None" = None) -> "int | None":
 
     if argv is None:
         argv = sys.argv[1:]
-    return duho.main(PveOsx, argv)
+    return duho.run(PveOsx, argv, exit=False)

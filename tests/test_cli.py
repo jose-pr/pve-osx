@@ -1,12 +1,8 @@
-import pytest
-
 from pve_osx.cli import PveOsx, run
 
 
 def test_help_exits_zero(capsys):
-    with pytest.raises(SystemExit) as exc:
-        run(["--help"])
-    assert exc.value.code == 0
+    assert run(["--help"]) == 0
     assert "pve-osx" in capsys.readouterr().out
 
 
