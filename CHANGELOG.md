@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- The entry now goes through `duho.run(..., exit=False)` and the errors a command
+  ends with are `duho.CommandError`, reported by the root's `_report_error_`.
+  The messages, streams and statuses are unchanged. New: Ctrl-C ends with
+  status 130 and a closed pipe with status 1, both without a traceback. `run()`
+  now returns `0` for `--help` and `--version` instead of raising `SystemExit`.
+- The `duho` requirement is now `>=0.7.4,<0.8`.
 - Bumped the `duho` dependency to `>=0.7.3,<0.8` (was the unbounded
   `>=0.3.2`). Pre-1.0, a duho minor bump is a documented API break by
   convention, so pinning to the series actually verified closes the
