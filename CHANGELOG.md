@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- `PVE_HOST`, `PVE_NODE`, `PVE_TOKEN_ID`, `PVE_TOKEN_SECRET` and `PVE_SSH_HOST` are read
+  by duho as the environment layer of `--host`, `--node`, `--token-id`, `--token-secret`
+  and `--ssh-host`; the order is the same (flag, then variable), and `--ssh-host` still
+  falls back to `--host`. An empty flag value (`--host ""`) now stays empty instead of
+  falling back to the variable.
 - The entry now goes through `duho.run(..., exit=False)` and the errors a command
   ends with are `duho.CommandError`, reported by the root's `_report_error_`.
   The messages, streams and statuses are unchanged. New: Ctrl-C ends with

@@ -11,7 +11,7 @@ from __future__ import annotations
 import os
 import typing as _ty
 
-from duho import CommandError
+from duho import CommandError, Meta
 
 from .cli import PveOsxCmd
 
@@ -19,19 +19,24 @@ from .cli import PveOsxCmd
 class PveConnectionArgs(PveOsxCmd):
     """Mixin supplying the flags every Proxmox-talking command needs."""
 
-    host: "_ty.Optional[str]" = None
+    # Each variable is named on its own field: a class-wide `_env_prefix_ = "PVE_"`
+    # would also reach the options of every command that extends this mixin
+    # (`PVE_NAME`, `PVE_VMID`, ...).
+    host: "_ty.Annotated[_ty.Optional[str], Meta(env='PVE_HOST')]" = None
     "Proxmox host (defaults to $PVE_HOST)"
     ("--host",)
 
-    node: "_ty.Optional[str]" = None
+    node: "_ty.Annotated[_ty.Optional[str], Meta(env='PVE_NODE')]" = None
     "Proxmox node name (defaults to $PVE_NODE, or auto-discovers for a single-node cluster)"
     ("--node",)
 
-    token_id: "_ty.Optional[str]" = None
+    token_id: "_ty.Annotated[_ty.Optional[str], Meta(env='PVE_TOKEN_ID')]" = None
     "API token id, user@realm!tokenid (defaults to $PVE_TOKEN_ID)"
     ("--token-id",)
 
-    token_secret: "_ty.Optional[str]" = None
+    token_secret: "_ty.Annotated[_ty.Optional[str], Meta(env='PVE_TOKEN_SECRET')]" = (
+        None
+    )
     "API token secret (defaults to $PVE_TOKEN_SECRET)"
     ("--token-secret",)
 
@@ -39,18 +44,18 @@ class PveConnectionArgs(PveOsxCmd):
     "Skip TLS certificate verification (defaults to $PVE_VERIFY_SSL=false, Proxmox's own default cert)"
     ("--insecure",)
 
-    ssh_host: "_ty.Optional[str]" = None
+    ssh_host: "_ty.Annotated[_ty.Optional[str], Meta(env='PVE_SSH_HOST')]" = None
     "SSH host/alias for operations the API can't do (defaults to $PVE_SSH_HOST, falls back to --host)"
     ("--ssh-host",)
 
     def pve(self):
         from .pve import PveClient
 
-        host = self.host or os.environ.get("PVE_HOST")
+        host = self.host
         if not host:
             raise CommandError("pve-osx: no Proxmox host given (--host or $PVE_HOST)")
-        token_id = self.token_id or os.environ.get("PVE_TOKEN_ID")
-        token_secret = self.token_secret or os.environ.get("PVE_TOKEN_SECRET")
+        token_id = self.token_id
+        token_secret = self.token_secret
         if not token_id or not token_secret:
             raise CommandError(
                 "pve-osx: no API token given (--token-id/--token-secret or "
@@ -65,7 +70,7 @@ class PveConnectionArgs(PveOsxCmd):
         )
         return PveClient(
             host,
-            self.node or os.environ.get("PVE_NODE"),
+            self.node,
             token_id,
             token_secret,
             verify_ssl=verify_ssl,
@@ -74,12 +79,7 @@ class PveConnectionArgs(PveOsxCmd):
     def ssh(self):
         from .ssh import SshClient
 
-        host = (
-            self.ssh_host
-            or os.environ.get("PVE_SSH_HOST")
-            or self.host
-            or os.environ.get("PVE_HOST")
-        )
+        host = self.ssh_host or self.host
         if not host:
             raise CommandError(
                 "pve-osx: no SSH host given (--ssh-host, $PVE_SSH_HOST, or --host)"
