@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   and `--ssh-host`; the order is the same (flag, then variable), and `--ssh-host` still
   falls back to `--host`. An empty flag value (`--host ""`) now stays empty instead of
   falling back to the variable.
+- `PVE_VERIFY_SSL` is read as duho reads a boolean: `1`, `true`, `yes`, `on`, `y`, `t` verify
+  the certificate, `0`, `false`, `no`, `off`, `n`, `f` and empty do not, in any case.
+  `on`, `y` and `t` used to be taken as false, and text that is none of these (`sometimes`)
+  used to turn verification off silently: it now ends the command with one line and status 1.
 - The entry now goes through `duho.run(..., exit=False)` and the errors a command
   ends with are `duho.CommandError`, reported by the root's `_report_error_`.
   The messages, streams and statuses are unchanged. New: Ctrl-C ends with

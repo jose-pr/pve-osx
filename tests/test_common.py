@@ -142,3 +142,38 @@ def test_only_the_connection_options_read_pve_variables(monkeypatch):
         "PVE_TOKEN_SECRET",
         "PVE_SSH_HOST",
     }
+
+
+@pytest.mark.parametrize(
+    ("text", "verified"),
+    [("true", True), ("1", True), ("yes", True), ("TRUE", True), ("on", True)]
+    + [("false", False), ("0", False), ("no", False), ("", False)],
+)
+def test_pve_verify_ssl_is_a_boolean(monkeypatch, text, verified):
+    monkeypatch.setenv("PVE_VERIFY_SSL", text)
+
+    assert _list("--host", "h", "--token-id", "a", "--token-secret", "b") == 0
+    assert FakeClient.made[-1][4] is verified
+
+
+def test_certificates_are_not_verified_unless_asked_for():
+    assert _list("--host", "h", "--token-id", "a", "--token-secret", "b") == 0
+    assert FakeClient.made[-1][4] is False
+
+
+def test_insecure_beats_a_variable_that_asks_for_verification(monkeypatch):
+    monkeypatch.setenv("PVE_VERIFY_SSL", "true")
+
+    argv = ["--host", "h", "--token-id", "a", "--token-secret", "b"]
+    assert _list(*argv, "--insecure") == 0
+    assert FakeClient.made[-1][4] is False
+
+
+def test_text_that_is_not_a_boolean_ends_the_command(monkeypatch, capsys):
+    monkeypatch.setenv("PVE_VERIFY_SSL", "sometimes")
+
+    assert _list("--host", "h", "--token-id", "a", "--token-secret", "b") == 1
+    assert capsys.readouterr().err == (
+        "pve-osx: $PVE_VERIFY_SSL is 'sometimes', not a boolean (true or false)\n"
+    )
+    assert FakeClient.made == []

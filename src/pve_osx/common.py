@@ -12,6 +12,7 @@ import os
 import typing as _ty
 
 from duho import CommandError, Meta
+from duho.text import parse_bool
 
 from .cli import PveOsxCmd
 
@@ -48,6 +49,19 @@ class PveConnectionArgs(PveOsxCmd):
     "SSH host/alias for operations the API can't do (defaults to $PVE_SSH_HOST, falls back to --host)"
     ("--ssh-host",)
 
+    @staticmethod
+    def _verify_ssl_requested() -> bool:
+        """``$PVE_VERIFY_SSL`` as a boolean (default false); text that is not one
+        ends the command, since guessing would decide whether TLS is checked."""
+        text = os.environ.get("PVE_VERIFY_SSL", "false")
+        try:
+            return parse_bool(text)
+        except ValueError:
+            raise CommandError(
+                f"pve-osx: $PVE_VERIFY_SSL is {text!r}, not a boolean "
+                "(true or false)"
+            ) from None
+
     def pve(self):
         from .pve import PveClient
 
@@ -61,13 +75,7 @@ class PveConnectionArgs(PveOsxCmd):
                 "pve-osx: no API token given (--token-id/--token-secret or "
                 "$PVE_TOKEN_ID/$PVE_TOKEN_SECRET)"
             )
-        verify_ssl = not self.insecure and os.environ.get(
-            "PVE_VERIFY_SSL", "false"
-        ).lower() in (
-            "1",
-            "true",
-            "yes",
-        )
+        verify_ssl = not self.insecure and self._verify_ssl_requested()
         return PveClient(
             host,
             self.node,
