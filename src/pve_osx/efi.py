@@ -18,7 +18,7 @@ import typing as _ty
 import uuid
 import zipfile
 
-from duho import Cli
+from duho import Cli, subcommand
 
 from .cli import PveOsx, PveOsxCmd
 
@@ -245,6 +245,7 @@ def add_kernel_entries(
         plistlib.dump(config, f)
 
 
+@subcommand(PveOsx)
 class Efi(PveOsxCmd, Cli):
     """EFI/OpenCore artifact building."""
 
@@ -254,17 +255,11 @@ class Efi(PveOsxCmd, Cli):
         raise NotImplementedError(self)
 
 
-PveOsx._register_subcmd_(Efi)
-
-
 class EfiCmd(PveOsxCmd):
     """Common base for every ``efi`` leaf command."""
 
-    @classmethod
-    def _register(cls) -> None:
-        Efi._register_subcmd_(cls)
 
-
+@subcommand(Efi)
 class EfiBuild(EfiCmd):
     """Build an OpenCore EFI folder for a macOS VM: verified OpenCore
     download, a fresh SMBIOS identity, and a patched config.plist."""
@@ -343,6 +338,3 @@ class EfiBuild(EfiCmd):
             "image for it yet"
         )
         return 0
-
-
-EfiBuild._register()

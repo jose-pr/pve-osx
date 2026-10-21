@@ -17,6 +17,7 @@ _LIVELOCK_ELAPSED_THRESHOLD_S = 20 * 60
 _LIVELOCK_CPU_THRESHOLD_PERCENT = 50.0
 
 
+@duho.subcommand(PveOsx)
 class Vm(PveOsxCmd, Cli):
     """VM lifecycle and diagnostics."""
 
@@ -26,17 +27,11 @@ class Vm(PveOsxCmd, Cli):
         raise NotImplementedError(self)
 
 
-PveOsx._register_subcmd_(Vm)
-
-
 class VmCmd(PveConnectionArgs):
     """Common base for every ``vm`` leaf command."""
 
-    @classmethod
-    def _register(cls) -> None:
-        Vm._register_subcmd_(cls)
 
-
+@duho.subcommand(Vm)
 class VmList(VmCmd):
     """List VMs on the node."""
 
@@ -51,9 +46,7 @@ class VmList(VmCmd):
         return 0
 
 
-VmList._register()
-
-
+@duho.subcommand(Vm)
 class VmDiagnose(VmCmd):
     """Diagnose a VM's boot/install progress: status, config, a console
     screenshot, and a livelock heuristic for the known kvm-pv-ipi issue."""
@@ -128,9 +121,7 @@ class VmDiagnose(VmCmd):
         Image.open(_io.BytesIO(ppm_bytes)).save(path)
 
 
-VmDiagnose._register()
-
-
+@duho.subcommand(Vm)
 class VmScreenshot(VmCmd):
     """Save a VM's current console screenshot (shorthand for ``vm diagnose --screenshot``)."""
 
@@ -152,9 +143,7 @@ class VmScreenshot(VmCmd):
         return 0
 
 
-VmScreenshot._register()
-
-
+@duho.subcommand(Vm)
 class VmCreate(VmCmd):
     """Create a macOS VM from a profile.
 
@@ -298,9 +287,7 @@ class VmCreate(VmCmd):
         return 0
 
 
-VmCreate._register()
-
-
+@duho.subcommand(Vm)
 class VmProvision(VmCmd):
     """Post-boot guest setup over SSH: verify Remote Login, enable Screen
     Sharing persistently, and install the community mac-guest-agent
@@ -392,6 +379,3 @@ class VmProvision(VmCmd):
                     "<vmid> --agent enabled=1,type=isa, then restart)"
                 )
         return 0
-
-
-VmProvision._register()

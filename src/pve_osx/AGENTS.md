@@ -11,9 +11,8 @@ overview, see the shipped `README.md`, or <https://github.com/jose-pr/pve-osx>.
   script and `python -m pve_osx`. `--version`/shell completion come from duho
   (`_version_ = duho.AUTO`, `_completion_ = True`).
 - **`PveOsxCmd`** — common base every subcommand extends (`duho.Cmd` +
-  `duho.LoggingArgs`). `cls._register()` attaches a leaf command to `PveOsx`'s
-  subcommand tree; call it once at the bottom of the module defining the
-  command.
+  `duho.LoggingArgs`). `@duho.subcommand(Parent)` on a command class attaches it
+  to `Parent`'s subcommand tree.
 - **`run(argv: list[str] | None = None) -> int | None`** — programmatic
   entry point used by both the console script and `__main__.py`.
 
@@ -121,8 +120,8 @@ itself a signal that thing has no REST endpoint.
 ## `pve-osx vm ...` (`pve_osx.vm`)
 
 Nested command group (`Vm(PveOsxCmd, duho.Cli)`, `_parsername_ = "vm"`).
-`VmCmd(PveConnectionArgs)` is the shared leaf base; `cls._register()` attaches
-onto `Vm`, not the root.
+`VmCmd(PveConnectionArgs)` is the shared leaf base; each leaf is decorated
+`@duho.subcommand(Vm)`, not the root.
 
 - **`vm list`** — one line per VM: `vmid  name  status  memMB`.
 - **`vm diagnose <vmid> [--screenshot PATH]`** — status + config, a host-side

@@ -17,15 +17,11 @@ class PveOsxCmd(LoggingArgs, duho.Cmd):
     """Common base for every pve-osx subcommand.
 
     Leaf commands subclass this, implement ``__call__``, and attach themselves
-    to the :class:`PveOsx` root's subcommand tree via ``cls._register()``.
+    to a parent's subcommand tree with ``@duho.subcommand(Parent)``.
     """
 
     def __call__(self) -> "int | None":
         raise NotImplementedError(self)
-
-    @classmethod
-    def _register(cls) -> None:
-        PveOsx._register_subcmd_(cls)
 
 
 class PveOsx(PveOsxCmd, Cli):
